@@ -9,29 +9,18 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+from .device_capabilities import default_mode_records
+
 
 NAME_RE = re.compile(r"^[a-z0-9_]+$")
 
 DEFAULT_STRIPS: list[dict[str, Any]] = []
 DEFAULT_ZONES: list[dict[str, Any]] = []
-DEFAULT_MODES: list[dict[str, Any]] = [
-    {"id": 0, "key": "off", "label": "Off", "enabled": True, "system": True},
-    {"id": 1, "key": "solid", "label": "Solid", "enabled": True, "system": True},
-    {"id": 2, "key": "rainbow", "label": "Rainbow", "enabled": True, "system": True},
-    {"id": 3, "key": "chase", "label": "Chase", "enabled": True, "system": True},
-    {"id": 4, "key": "scanner", "label": "Scanner", "enabled": True, "system": True},
-    {"id": 5, "key": "breathing", "label": "Breathing", "enabled": True, "system": True},
-    {"id": 6, "key": "wave", "label": "Wave", "enabled": True, "system": True},
-    {"id": 7, "key": "chroma", "label": "Chroma", "enabled": True, "system": True},
-    {"id": 8, "key": "colorwaves", "label": "Colorwaves", "enabled": True, "system": True},
-    {"id": 9, "key": "twinkle", "label": "Twinkle", "enabled": True, "system": True},
-    {"id": 10, "key": "confetti", "label": "Confetti", "enabled": True, "system": True},
-]
+DEFAULT_MODES: list[dict[str, Any]] = default_mode_records()
 DEFAULT_SETTINGS: dict[str, Any] = {
     "serial_port": "/dev/ttyACM0",
     "baud_rate": 115200,
     "flush_interval_ms": 50,
-    "pin_options": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
 }
 DEFAULT_PRESETS: list[dict[str, Any]] = []
 
@@ -65,6 +54,7 @@ class Storage:
             self._zones = self._read_json("zones", DEFAULT_ZONES)
             self._modes = self._normalize_modes(self._read_json("modes", DEFAULT_MODES))
             self._settings = self._read_json("settings", DEFAULT_SETTINGS)
+            self._settings.pop("pin_options", None)
             self._presets = self._normalize_presets(self._read_json("presets", DEFAULT_PRESETS))
             self._persist_all()
 

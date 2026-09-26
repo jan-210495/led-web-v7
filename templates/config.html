@@ -18,7 +18,7 @@
             <div>
                 <label>Arduino pin</label>
                 <select id="new_strip_pin">
-                    {% for pin in settings.pin_options %}
+                    {% for pin in device_capabilities.supported_data_pins %}
                     <option value="{{ pin }}">{{ pin }}</option>
                     {% endfor %}
                 </select>
@@ -35,7 +35,7 @@
         </div>
 
         <div class="note top-gap">
-            V7 uses FastLED firmware-supported pins. The Arduino sketch currently compiles support for pins 2-13.
+            V7 uses FastLED firmware-supported pins. This firmware build supports pins {{ device_capabilities.supported_data_pins | join(', ') }}, with up to {{ device_capabilities.max_pixels_per_strip }} pixels per strip.
         </div>
 
         <div id="strip_status" class="status"></div>

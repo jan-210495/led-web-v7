@@ -144,6 +144,42 @@ No full Flask smoke test, serial-device test, Arduino compile, or formal test su
 **Follow-up**
 - Next approved work must be roadmap Step 2.1: define one canonical V7 device-capability contract in Python.
 
+### 2026-09-26 — Step 2.1: Canonical V7 device-capability contract
+
+**Intent**
+- Give the Python application one explicit, tested mirror of the limits and built-in effects compiled into the V7 FastLED firmware.
+- Remove UI/bootstrap dependence on persisted or duplicated capability literals without changing accepted hardware configurations yet.
+
+**Changes**
+- Added `led_web_v7/device_capabilities.py`.
+  - Mirrors V7 firmware family, supported data pins 2–13, maximum active strips (12), pixels per strip (300), zones (20), command length (180), and effects 0–10.
+  - Provides immutable effect definitions, the built-in ID set for future validation, fresh default mode records, and a JSON-safe bootstrap payload.
+  - Documents that `arduino/V7/V7.ino` remains the hardware authority and must be kept in sync.
+- Replaced the duplicated Python default-mode literal list with mode records derived from the capability module.
+- Removed the derived `pin_options` field from persistent serial settings and migrated legacy saved settings by removing that field during normal load/persist. Pins are hardware capabilities, not user-editable serial configuration.
+- Added `device_capabilities` to every bootstrap response and the browser's `window.APP_BOOTSTRAP` payload.
+- Changed the Configuration page's new-strip pin menu and FastLED hardware note to use bootstrap capability data.
+- Added a matching firmware comment plus README/agent guidance so future firmware changes update the Python mirror in the same change.
+
+**Verification**
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m pytest` — **14 passed**.
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m py_compile app.py led_web_v7/*.py` — **passed**.
+- Ran the capability-only tests — **2 passed**.
+- Printed and inspected the JSON-safe capability payload; it contains all V7 limits and effects 0–10.
+- Searched the Python application/template source after the refactor: capability literals remain only in `device_capabilities.py`; the legacy `pin_options` reference is retained solely for one-time compatibility cleanup. Persisted `data/modes.json` remains user-editable mode state, not a source of default capability definitions.
+- Arduino compile/hardware verification: not applicable for this metadata/UI change; no firmware behavior was changed.
+
+**Decisions / trade-offs**
+- The capability module is a deliberate Python mirror, not generated code. The Arduino sketch remains authoritative because it is what physically controls the hardware. The code comments and documentation make synchronization an explicit maintainer responsibility.
+- Step 2.1 exposes and centralizes limits but intentionally does **not** reject existing out-of-range strips, modes, or commands. That behavioral enforcement is the narrowly scoped next step (2.2), avoiding a combined refactor/behavior-change commit.
+- Existing settings files with `pin_options` are migrated safely on first load. The public bootstrap now exposes the richer `device_capabilities` object; the obsolete `settings.pin_options` field is removed.
+
+**Commit**
+- Recorded in the completion response after the single step commit is created and pushed.
+
+**Follow-up**
+- Next approved work must be roadmap Step 2.2: enforce firmware layout limits in the storage/API layer.
+
 ## Template for future completed steps
 
 Copy and fill this structure after each implementation step:

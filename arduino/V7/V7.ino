@@ -3,6 +3,7 @@
 // LED Controller V7 firmware for Arduino Due.
 // V7 keeps the V6 serial protocol, but uses FastLED with firmware-supported pins.
 // Runtime strip config can activate supported pins and choose pixel counts.
+// Keep matching Python capability metadata in led_web_v7/device_capabilities.py.
 
 #define LED_TYPE WS2812B
 #define COLOR_ORDER BRG

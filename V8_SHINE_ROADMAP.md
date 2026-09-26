@@ -57,9 +57,10 @@ Make this a dependable, understandable LED controller that:
 
 ## Phase 2 — Make the layout model truthful before it reaches hardware
 
-- [ ] **2.1 Define one canonical V7 device-capability contract in Python.**
+- [x] **2.1 Define one canonical V7 device-capability contract in Python.**
   - Scope: centralize supported pins, maximum strip count, pixels per strip, zone count, command length, and built-in effect IDs in a dedicated module derived from the V7 firmware contract.
   - Done when: validation and UI/bootstrap capability data use this one source instead of scattered literals; existing hardware behavior remains unchanged.
+  - Completed 2026-09-26: added `device_capabilities.py` as the firmware mirror; defaults, configuration UI, and bootstrap payload now use it, while actual rejection/enforcement remains isolated for Step 2.2.
 
 - [ ] **2.2 Enforce firmware layout limits in the storage/API layer.**
   - Scope: use the capability contract to reject unsupported pins, strip lengths over 300, more than 12 strips, more than 20 zones, invalid mode IDs, and unsafe command payloads before writing JSON or queueing commands.

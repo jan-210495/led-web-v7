@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from led_web_v7.device_capabilities import SUPPORTED_DATA_PINS, bootstrap_capabilities
+
 
 def test_bootstrap_uses_isolated_default_data_and_never_needs_serial_hardware(client) -> None:
     response = client.get("/api/bootstrap")
@@ -11,7 +13,20 @@ def test_bootstrap_uses_isolated_default_data_and_never_needs_serial_hardware(cl
     assert payload["presets"] == []
     assert payload["total_pixels"] == 0
     assert [mode["id"] for mode in payload["enabled_modes"]] == list(range(11))
+    assert payload["device_capabilities"] == bootstrap_capabilities()
+    assert "pin_options" not in payload["settings"]
     assert payload["serial_status"]["connected"] is False
+
+
+def test_configuration_page_uses_the_canonical_supported_pin_list(client) -> None:
+    response = client.get("/config")
+
+    assert response.status_code == 200
+    page = response.get_data(as_text=True)
+    assert 'id="new_strip_pin"' in page
+    for pin in SUPPORTED_DATA_PINS:
+        assert f'<option value="{pin}">{pin}</option>' in page
+    assert "300 pixels per strip" in page
 
 
 def test_strip_and_zone_api_create_a_valid_virtual_layout(client, app) -> None:

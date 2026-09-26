@@ -34,7 +34,7 @@ python3 -m py_compile app.py led_web_v7/*.py
 
 V7 uses FastLED. Unlike the V6 Adafruit NeoPixel firmware, arbitrary runtime data pins are not the goal. Supported data pins are compiled into `arduino/V7/V7.ino`; the web app can activate those supported pins and set pixel counts with `CLEAR_STRIPS` and `ADD_STRIP:<pin>:<count>`.
 
-If protocol commands change, update both `led_web_v7/sync_engine.py` and `arduino/V7/V7.ino`.
+If protocol commands change, update both `led_web_v7/sync_engine.py` and `arduino/V7/V7.ino`. If compiled capabilities or built-in effects change, update `led_web_v7/device_capabilities.py` in the same change; it is the app's canonical mirror of the firmware contract.
 
 ## Testing Guidelines
 

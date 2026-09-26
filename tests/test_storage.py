@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
 
 import led_web_v7.storage as storage_module
+from led_web_v7.device_capabilities import default_mode_records
 from led_web_v7.storage import Storage, StorageDataError
 
 
@@ -18,9 +20,36 @@ def test_storage_creates_default_data_files(tmp_path: Path) -> None:
     assert snapshot["zones"] == []
     assert snapshot["presets"] == []
     assert snapshot["total_pixels"] == 0
-    assert [mode["id"] for mode in snapshot["modes"]] == list(range(11))
+    assert snapshot["modes"] == default_mode_records()
     assert snapshot["settings"]["serial_port"] == "/dev/ttyACM0"
+    assert "pin_options" not in snapshot["settings"]
     assert all((data_dir / f"{name}.json").exists() for name in ("strips", "zones", "modes", "settings", "presets"))
+
+
+def test_storage_migrates_legacy_pin_options_out_of_serial_settings(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    settings_path = data_dir / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "serial_port": "/dev/ttyUSB0",
+                "baud_rate": 57600,
+                "flush_interval_ms": 100,
+                "pin_options": [99],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    storage = Storage(data_dir)
+
+    assert storage.snapshot()["settings"] == {
+        "serial_port": "/dev/ttyUSB0",
+        "baud_rate": 57600,
+        "flush_interval_ms": 100,
+    }
+    assert "pin_options" not in json.loads(settings_path.read_text(encoding="utf-8"))
 
 
 def test_storage_rejects_zone_without_a_configured_strip(tmp_path: Path) -> None:

@@ -5,6 +5,8 @@ from zoneinfo import ZoneInfo
 
 from flask import Blueprint, current_app, jsonify, render_template, request
 
+from .device_capabilities import bootstrap_capabilities
+
 
 web = Blueprint("web", __name__)
 
@@ -32,6 +34,7 @@ def bootstrap_payload() -> dict:
         **snapshot,
         "pixel_layout": storage().pixel_layout(),
         "enabled_modes": storage().enabled_modes(),
+        "device_capabilities": bootstrap_capabilities(),
         "serial_status": serial_manager().status(),
         "serial_history": serial_manager().history()[-25:],
         "runtime_state": runtime().snapshot(),

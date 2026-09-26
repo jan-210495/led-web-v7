@@ -47,6 +47,10 @@ python -m py_compile app.py led_web_v7/*.py
 
 Configuration in `data/*.json` is written through a same-directory temporary file and atomically replaced, so a process or power failure cannot leave a partially written target JSON file. If an existing data file is malformed, unreadable, or has the wrong top-level JSON type, startup fails safely with the file path and relevant parse location in the service logs. The controller deliberately does **not** overwrite that file: repair it or restore a backup, then restart the service.
 
+### Firmware capability contract
+
+`led_web_v7/device_capabilities.py` is the Python application's canonical mirror of the limits and built-in effects compiled into `arduino/V7/V7.ino`. It supplies capability data to the configuration UI and `/api/bootstrap`; it is not a replacement for firmware limits. When changing supported pins, strip/zone limits, command length, or built-in effects in the sketch, update this module in the same change.
+
 ## Homeserver Deployment
 
 Runtime belongs on the homeserver:
