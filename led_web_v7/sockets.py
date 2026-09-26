@@ -5,13 +5,25 @@ from typing import Any
 from flask import current_app
 from flask_socketio import SocketIO, emit
 
+from .device_capabilities import validate_byte, validate_effect_id, validate_rgb
+
 
 def register_socket_handlers(socketio: SocketIO) -> None:
     def runtime():
         return current_app.extensions["led.runtime"]
 
+    def storage():
+        return current_app.extensions["led.storage"]
+
     def sync_engine():
         return current_app.extensions["led.sync"]
+
+    def require_existing_zone(value: Any) -> str:
+        if not isinstance(value, str):
+            raise ValueError("Zone name must be text")
+        if storage().zone_by_name(value) is None:
+            raise ValueError("Zone not found")
+        return value
 
     def bootstrap_payload():
         from .routes import bootstrap_payload as build_payload
@@ -24,7 +36,7 @@ def register_socket_handlers(socketio: SocketIO) -> None:
 
     @socketio.on("global_color")
     def handle_global_color(data: dict[str, Any]):
-        color = [int(data["r"]), int(data["g"]), int(data["b"])]
+        color = validate_rgb([data["r"], data["g"], data["b"]])
         global_state = runtime().global_state()
         palette = list(global_state.get("palette") or [[255, 96, 32], [255, 0, 140], [0, 190, 255]])
         palette[0] = color
@@ -33,7 +45,7 @@ def register_socket_handlers(socketio: SocketIO) -> None:
 
     @socketio.on("global_mode")
     def handle_global_mode(data: dict[str, Any]):
-        mode = int(data["mode"])
+        mode = validate_effect_id(data["mode"])
         global_state = runtime().global_state()
         global_state["mode"] = mode
         global_state["enabled"] = mode != 0
@@ -47,7 +59,7 @@ def register_socket_handlers(socketio: SocketIO) -> None:
 
     @socketio.on("global_brightness")
     def handle_global_brightness(data: dict[str, Any]):
-        brightness = int(data["brightness"])
+        brightness = validate_byte(data["brightness"], "Brightness")
         runtime().set_global(brightness=brightness)
         sync_engine().queue_global("brightness", brightness)
 
@@ -75,8 +87,8 @@ def register_socket_handlers(socketio: SocketIO) -> None:
 
     @socketio.on("zone_color")
     def handle_zone_color(data: dict[str, Any]):
-        name = data["zone"]
-        color = [int(data["r"]), int(data["g"]), int(data["b"])]
+        name = require_existing_zone(data["zone"])
+        color = validate_rgb([data["r"], data["g"], data["b"]])
         zone_state = runtime().ensure_zone(name)
         palette = list(zone_state.get("palette") or [[255, 96, 32], [255, 0, 140], [0, 190, 255]])
         palette[0] = color
@@ -85,8 +97,8 @@ def register_socket_handlers(socketio: SocketIO) -> None:
 
     @socketio.on("zone_mode")
     def handle_zone_mode(data: dict[str, Any]):
-        name = data["zone"]
-        mode = int(data["mode"])
+        name = require_existing_zone(data["zone"])
+        mode = validate_effect_id(data["mode"])
         zone_state = runtime().ensure_zone(name)
         zone_state["mode"] = mode
         zone_state["enabled"] = mode != 0
@@ -100,24 +112,25 @@ def register_socket_handlers(socketio: SocketIO) -> None:
 
     @socketio.on("zone_brightness")
     def handle_zone_brightness(data: dict[str, Any]):
-        name = data["zone"]
-        brightness = int(data["brightness"])
+        name = require_existing_zone(data["zone"])
+        brightness = validate_byte(data["brightness"], "Brightness")
         runtime().set_zone(name, brightness=brightness)
         sync_engine().queue_zone(name, "brightness", brightness)
 
     @socketio.on("zone_on")
     def handle_zone_on(data: dict[str, Any]):
-        name = data["zone"]
+        name = require_existing_zone(data["zone"])
         runtime().set_zone(name, enabled=True)
         sync_engine().queue_direct(f"ZONE_ON:{name}")
 
     @socketio.on("zone_off")
     def handle_zone_off(data: dict[str, Any]):
-        name = data["zone"]
+        name = require_existing_zone(data["zone"])
         sync_engine().clear_zone_pending(name)
         runtime().set_zone(name, enabled=False)
         sync_engine().queue_direct(f"ZONE_OFF:{name}")
 
     @socketio.on("identify")
     def handle_identify(data: dict[str, Any]):
-        sync_engine().queue_direct(f"ZONE_IDENTIFY:{data['zone']}")
+        name = require_existing_zone(data["zone"])
+        sync_engine().queue_direct(f"ZONE_IDENTIFY:{name}")

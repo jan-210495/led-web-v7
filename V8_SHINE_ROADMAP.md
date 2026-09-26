@@ -62,9 +62,10 @@ Make this a dependable, understandable LED controller that:
   - Done when: validation and UI/bootstrap capability data use this one source instead of scattered literals; existing hardware behavior remains unchanged.
   - Completed 2026-09-26: added `device_capabilities.py` as the firmware mirror; defaults, configuration UI, and bootstrap payload now use it, while actual rejection/enforcement remains isolated for Step 2.2.
 
-- [ ] **2.2 Enforce firmware layout limits in the storage/API layer.**
+- [x] **2.2 Enforce firmware layout limits in the storage/API layer.**
   - Scope: use the capability contract to reject unsupported pins, strip lengths over 300, more than 12 strips, more than 20 zones, invalid mode IDs, and unsafe command payloads before writing JSON or queueing commands.
   - Done when: impossible hardware configurations receive clear HTTP 400 messages and are covered by tests.
+  - Completed 2026-09-26: centralized validators now block impossible persisted/API/live-control configuration, direct-command overflow/injection, and invalid firmware effects before hardware queueing; regression suite expanded to 23 tests.
 
 - [ ] **2.3 Preserve virtual-pixel mapping during strip changes.**
   - Scope: explicitly define stable physical strip ordering and prevent or safely handle edits/deletions that would silently make existing zone indexes point at different LEDs.

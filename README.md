@@ -51,6 +51,10 @@ Configuration in `data/*.json` is written through a same-directory temporary fil
 
 `led_web_v7/device_capabilities.py` is the Python application's canonical mirror of the limits and built-in effects compiled into `arduino/V7/V7.ino`. It supplies capability data to the configuration UI and `/api/bootstrap`; it is not a replacement for firmware limits. When changing supported pins, strip/zone limits, command length, or built-in effects in the sketch, update this module in the same change.
 
+### Firmware-limit validation
+
+The application rejects unsupported data pins, strips longer than 300 pixels, more than 12 active strips, more than 20 zones, uncompiled effect IDs, and zone names/commands that would overflow the firmware serial buffer. HTTP configuration APIs return `400` with the validation message. Existing persisted layouts are also checked at startup so unsupported hardware data cannot be synchronized accidentally; repair the named JSON file before restarting if startup reports an incompatible configuration.
+
 ## Homeserver Deployment
 
 Runtime belongs on the homeserver:

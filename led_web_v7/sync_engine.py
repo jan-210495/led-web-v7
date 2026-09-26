@@ -8,6 +8,7 @@ from typing import Any
 
 from serial import SerialException
 
+from .device_capabilities import validate_command_payload, validate_live_control_value, validate_zone_name_command_length
 from .runtime import RuntimeState
 from .serial_manager import SerialManager
 from .storage import Storage
@@ -42,14 +43,18 @@ class SyncEngine:
             return deepcopy(self._sync_state)
 
     def queue_direct(self, command: str) -> None:
+        command = validate_command_payload(command)
         with self._pending_lock:
             self._direct_queue.append(command)
 
     def queue_global(self, key: str, value: Any) -> None:
+        value = validate_live_control_value(key, value)
         with self._pending_lock:
             self._pending_updates["global"][key] = value
 
     def queue_zone(self, name: str, key: str, value: Any) -> None:
+        name = validate_zone_name_command_length(name)
+        value = validate_live_control_value(key, value)
         with self._pending_lock:
             payload = self._pending_updates["zones"].setdefault(name, {})
             payload[key] = value

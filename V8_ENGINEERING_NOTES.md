@@ -180,6 +180,54 @@ No full Flask smoke test, serial-device test, Arduino compile, or formal test su
 **Follow-up**
 - Next approved work must be roadmap Step 2.2: enforce firmware layout limits in the storage/API layer.
 
+### 2026-09-26 — Step 2.2: Enforce V7 firmware layout and command limits
+
+**Intent**
+- Reject configurations and live-control values that the currently compiled V7 firmware cannot honor, before they are persisted or sent to serial.
+- Make invalid persisted hardware configuration fail safely at startup instead of allowing a later partial/failed hardware sync.
+
+**Changes**
+- Extended `device_capabilities.py` with reusable validators for:
+  - supported pins; pixel count; active strip count; zone count; built-in effect IDs;
+  - RGB/brightness values; palette shape; animation delay; and all queueable live-control values;
+  - serial command byte length, embedded line breaks, and the maximum safe zone-name length.
+- Documented the firmware detail that its 180-byte command buffer includes the C-string terminator. Commands therefore allow at most 179 UTF-8 payload bytes before the newline. The longest zone command is a palette update, which permits a 130-byte ASCII zone name; this is calculated from the shared command contract, not hard-coded in storage or UI.
+- Enforced V7 limits in `Storage` before writes:
+  - data pin must be 2–13;
+  - strip length must be 1–300;
+  - active strip count cannot exceed 12;
+  - zone count cannot exceed 20;
+  - zone names must be serial-safe;
+  - persisted/custom/preset effect IDs must be compiled IDs 0–10.
+- Validated persisted strips, zones, modes, and presets at startup. Incompatible saved data raises the existing file-specific `StorageDataError` and is left untouched for repair.
+- Added command safety at both queue and serial boundaries:
+  - direct commands are checked before entering `SyncEngine`'s queue;
+  - queued global/zone state is range-checked before command construction;
+  - `SerialManager.send` and `query` apply a final command-payload check before opening/writing a port.
+- Validated Socket.IO live effect/color/brightness changes before mutating runtime state or queueing commands. Zone actions now require an existing stored zone, preventing unknown zone names from becoming raw serial commands.
+- Added browser constraints derived from capability bootstrap data: strip pixel inputs have a maximum of 300 and new zone names have the calculated maximum length.
+- Corrected a durability detail discovered during the real checked-in data validation: atomic replacement now preserves an existing data file's permission bits instead of replacing them with the temporary file's default mode.
+- Added README documentation for enforced firmware limits.
+
+**Verification**
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m pytest` — **23 passed**.
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m py_compile app.py led_web_v7/*.py` — **passed**.
+- Verified a maximum-length zone name produces a 179-byte `ZONE_PALETTE` command, exactly matching the usable firmware payload capacity.
+- Loaded the repository's real `data/` directory through `Storage` after the change: 0 strips, 0 zones, 11 modes, 0 presets, 0 total pixels; no content or permission-mode diff was produced.
+- Arduino compile/hardware verification: not applicable for this server-side validation step; no executable firmware behavior was changed.
+
+**Decisions / trade-offs**
+- Unsupported effect IDs now fail rather than being saved as arbitrary labels or being sent to firmware's solid-color fallback. The old Configuration-page custom-mode control may now show an explicit 400 validation error for noncompiled IDs; a later UX-only roadmap step (5.2) will clarify/remove that obsolete affordance.
+- Existing incompatible persisted layout/effect data fails fast with a recovery message. Silently clipping or deleting stored hardware configuration could physically remap or unexpectedly turn off LEDs.
+- Command validation is duplicated at queue and serial boundaries intentionally: normal app paths fail before queuing, while the serial boundary remains a final guard for future/internal callers and layout sync.
+- Existing file permissions are preserved during atomic replacement. New files keep the secure temporary-file default; no permission broadening was introduced.
+
+**Commit**
+- Recorded in the completion response after the single step commit is created and pushed.
+
+**Follow-up**
+- Next approved work must be roadmap Step 2.3: preserve virtual-pixel mapping during strip changes.
+
 ## Template for future completed steps
 
 Copy and fill this structure after each implementation step:

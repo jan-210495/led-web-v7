@@ -3,13 +3,22 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import tempfile
 import threading
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
-from .device_capabilities import default_mode_records
+from .device_capabilities import (
+    MAX_ACTIVE_STRIPS,
+    MAX_ZONES,
+    default_mode_records,
+    validate_effect_id,
+    validate_pixel_count,
+    validate_supported_data_pin,
+    validate_zone_name_command_length,
+)
 
 
 NAME_RE = re.compile(r"^[a-z0-9_]+$")
@@ -51,12 +60,37 @@ class Storage:
     def load(self) -> None:
         with self._lock:
             self._strips = self._read_json("strips", DEFAULT_STRIPS)
+            self._validate_persisted("strips", self._validate_persisted_strips)
             self._zones = self._read_json("zones", DEFAULT_ZONES)
-            self._modes = self._normalize_modes(self._read_json("modes", DEFAULT_MODES))
+            self._validate_persisted("zones", self._validate_persisted_zones)
+            self._modes = self._normalize_persisted("modes", self._read_json("modes", DEFAULT_MODES), self._normalize_modes)
             self._settings = self._read_json("settings", DEFAULT_SETTINGS)
             self._settings.pop("pin_options", None)
-            self._presets = self._normalize_presets(self._read_json("presets", DEFAULT_PRESETS))
+            self._presets = self._normalize_persisted(
+                "presets",
+                self._read_json("presets", DEFAULT_PRESETS),
+                self._normalize_presets,
+            )
             self._persist_all()
+
+    def _normalize_persisted(self, key: str, payload: Any, normalizer: Any) -> Any:
+        try:
+            return normalizer(payload)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise self._persisted_config_error(key, exc) from exc
+
+    def _validate_persisted(self, key: str, validator: Any) -> None:
+        try:
+            validator()
+        except (KeyError, TypeError, ValueError) as exc:
+            raise self._persisted_config_error(key, exc) from exc
+
+    def _persisted_config_error(self, key: str, exc: Exception) -> StorageDataError:
+        path = self._paths[key]
+        return StorageDataError(
+            f"Data file '{path}' contains configuration unsupported by V7 firmware: {exc}. "
+            "The file was not changed; repair it or restore a backup before restarting."
+        )
 
     def _read_json(self, key: str, default: Any) -> Any:
         path = self._paths[key]
@@ -93,6 +127,7 @@ class Storage:
         temporary_path: Path | None = None
         replaced_target = False
         try:
+            existing_mode = stat.S_IMODE(path.stat().st_mode) if path.exists() else None
             with tempfile.NamedTemporaryFile(
                 mode="w",
                 encoding="utf-8",
@@ -102,6 +137,8 @@ class Storage:
                 delete=False,
             ) as handle:
                 temporary_path = Path(handle.name)
+                if existing_mode is not None:
+                    os.chmod(temporary_path, existing_mode)
                 json.dump(payload, handle, indent=2)
                 handle.write("\n")
                 handle.flush()
@@ -187,13 +224,66 @@ class Storage:
     def enabled_modes(self) -> list[dict[str, Any]]:
         return [mode for mode in self._modes if mode["enabled"]]
 
+    def _validate_persisted_strips(self) -> None:
+        if len(self._strips) > MAX_ACTIVE_STRIPS:
+            raise ValueError(f"V7 supports at most {MAX_ACTIVE_STRIPS} active strips")
+
+        assigned_pins: set[int] = set()
+        for index, strip in enumerate(self._strips, start=1):
+            if not isinstance(strip, dict):
+                raise ValueError(f"Strip entry {index} must be an object")
+            int(strip["id"])
+            pin = validate_supported_data_pin(strip["pin"])
+            validate_pixel_count(strip["pixel_count"])
+            if pin in assigned_pins:
+                raise ValueError(f"Pin {pin} is assigned to more than one strip")
+            assigned_pins.add(pin)
+
+    def _validate_persisted_zones(self) -> None:
+        if len(self._zones) > MAX_ZONES:
+            raise ValueError(f"V7 supports at most {MAX_ZONES} zones")
+
+        total_pixels = self.total_pixels()
+        known_names: set[str] = set()
+        known_ranges: list[tuple[str, int, int]] = []
+        for index, zone in enumerate(self._zones, start=1):
+            if not isinstance(zone, dict):
+                raise ValueError(f"Zone entry {index} must be an object")
+            raw_name = zone["name"]
+            name = self._normalize_name(raw_name)
+            if name != raw_name:
+                raise ValueError("Zone names must already use lowercase letters, numbers, and underscores")
+            if name in known_names:
+                raise ValueError(f"Zone name '{name}' is duplicated")
+            known_names.add(name)
+
+            start = int(zone["start"])
+            end = int(zone["end"])
+            if total_pixels <= 0:
+                raise ValueError("Add at least one strip before creating zones")
+            if start < 0 or end < 0:
+                raise ValueError("Pixels must be >= 0")
+            if start > end:
+                raise ValueError("Start pixel must be <= end pixel")
+            if end >= total_pixels:
+                raise ValueError(f"End pixel must be < total pixel count ({total_pixels})")
+            for existing_name, existing_start, existing_end in known_ranges:
+                overlaps = not (end < existing_start or start > existing_end)
+                if overlaps:
+                    raise ValueError(
+                        f"Overlap with zone '{existing_name}' ({existing_start}-{existing_end})"
+                    )
+            known_ranges.append((name, start, end))
+
     def _normalize_name(self, value: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError("Name must be text")
         name = value.strip().lower()
         if not name:
             raise ValueError("Name is required")
         if not NAME_RE.match(name):
             raise ValueError("Name must use lowercase letters, numbers, and underscores")
-        return name
+        return validate_zone_name_command_length(name)
 
     def _normalize_label(self, name: str, label: str | None) -> str:
         return (label or "").strip() or name.replace("_", " ").title()
@@ -201,7 +291,7 @@ class Storage:
     def _normalize_modes(self, modes: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized_by_id: dict[int, dict[str, Any]] = {}
         for mode in modes:
-            mode_id = int(mode["id"])
+            mode_id = validate_effect_id(mode["id"])
             normalized_by_id[mode_id] = {
                 "id": mode_id,
                 "key": str(mode.get("key") or f"mode_{mode_id}").strip().lower(),
@@ -247,7 +337,7 @@ class Storage:
                     {
                         "zone": zone_name,
                         "enabled": bool(zone.get("enabled", True)),
-                        "mode": int(zone.get("mode", 1)),
+                        "mode": validate_effect_id(zone.get("mode", 1)),
                         "brightness": max(0, min(255, int(zone.get("brightness", 96)))),
                         "delay_ms": max(10, min(2000, int(zone.get("delay_ms", 40)))),
                         "palette": self._normalize_palette(zone.get("palette")),
@@ -284,12 +374,10 @@ class Storage:
 
     def add_strip(self, pin: int, pixel_count: int, label: str | None = None) -> dict[str, Any]:
         with self._lock:
-            pin = int(pin)
-            pixel_count = int(pixel_count)
-            if pin < 0:
-                raise ValueError("Pin must be >= 0")
-            if pixel_count <= 0:
-                raise ValueError("Pixel count must be > 0")
+            if len(self._strips) >= MAX_ACTIVE_STRIPS:
+                raise ValueError(f"V7 supports at most {MAX_ACTIVE_STRIPS} active strips")
+            pin = validate_supported_data_pin(pin)
+            pixel_count = validate_pixel_count(pixel_count)
             if any(int(strip["pin"]) == pin for strip in self._strips):
                 raise ValueError(f"Pin {pin} is already assigned")
 
@@ -307,10 +395,8 @@ class Storage:
 
     def update_strip(self, strip_id: int, pin: int, pixel_count: int, label: str | None = None) -> dict[str, Any]:
         with self._lock:
-            pin = int(pin)
-            pixel_count = int(pixel_count)
-            if pixel_count <= 0:
-                raise ValueError("Pixel count must be > 0")
+            pin = validate_supported_data_pin(pin)
+            pixel_count = validate_pixel_count(pixel_count)
             target = None
             for strip in self._strips:
                 if int(strip["id"]) == int(strip_id):
@@ -348,6 +434,8 @@ class Storage:
 
     def add_zone(self, name: str, start: int, end: int, label: str | None = None) -> dict[str, Any]:
         with self._lock:
+            if len(self._zones) >= MAX_ZONES:
+                raise ValueError(f"V7 supports at most {MAX_ZONES} zones")
             zone_name = self._normalize_name(name)
             if self.zone_by_name(zone_name):
                 raise ValueError("Zone already exists")
@@ -393,11 +481,9 @@ class Storage:
 
     def add_mode(self, mode_id: int, label: str, enabled: bool = True) -> dict[str, Any]:
         with self._lock:
-            mode_id = int(mode_id)
+            mode_id = validate_effect_id(mode_id)
             if any(int(mode["id"]) == mode_id for mode in self._modes):
                 raise ValueError("Mode ID already exists")
-            if mode_id < 0:
-                raise ValueError("Mode ID must be >= 0")
             cleaned_label = (label or "").strip()
             if not cleaned_label:
                 raise ValueError("Mode label is required")
@@ -415,6 +501,7 @@ class Storage:
 
     def update_mode(self, mode_id: int, label: str, enabled: bool) -> dict[str, Any]:
         with self._lock:
+            mode_id = validate_effect_id(mode_id)
             target = None
             for mode in self._modes:
                 if int(mode["id"]) == int(mode_id):
@@ -433,6 +520,7 @@ class Storage:
 
     def delete_mode(self, mode_id: int) -> None:
         with self._lock:
+            mode_id = validate_effect_id(mode_id)
             target = None
             for mode in self._modes:
                 if int(mode["id"]) == int(mode_id):

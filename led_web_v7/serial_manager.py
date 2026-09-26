@@ -10,6 +10,7 @@ from typing import Any
 import serial
 
 from .config import AppConfig
+from .device_capabilities import validate_command_payload
 from .storage import Storage
 
 
@@ -72,6 +73,7 @@ class SerialManager:
             return self._serial
 
     def send(self, command: str) -> None:
+        command = validate_command_payload(command)
         with self._lock:
             try:
                 if self._serial is None or not self._serial.is_open:
@@ -106,6 +108,7 @@ class SerialManager:
         return self.read_lines(duration)
 
     def query(self, command: str, duration: float = 0.4) -> list[str]:
+        command = validate_command_payload(command)
         self.connect()
         self.drain(0.08)
         self.send(command)

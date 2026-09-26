@@ -39,8 +39,9 @@ def app(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
 
     monkeypatch.setattr(SyncEngine, "sync_layout", record_layout_sync)
 
-    app, _socketio = led_web_v7.create_app()
+    app, socketio = led_web_v7.create_app()
     app.config.update(TESTING=True)
+    app.extensions["test.socketio"] = socketio
     app.extensions["test.sync_reasons"] = sync_reasons
     return app
 
