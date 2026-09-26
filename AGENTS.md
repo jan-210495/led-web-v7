@@ -38,7 +38,9 @@ If protocol commands change, update both `led_web_v7/sync_engine.py` and `arduin
 
 ## Testing Guidelines
 
-There is no formal test suite yet. At minimum, run `py_compile`, then smoke-test these URLs on V7: `/`, `/zones`, `/modes`, `/config`, `/diagnostics`, and `/api/bootstrap`.
+Run `python -m pytest` and `python3 -m py_compile app.py led_web_v7/*.py` before deployment. The initial regression suite covers isolated app creation, default bootstrap data, storage validation, and selected strip/zone API success and error paths without serial hardware.
+
+For UI-affecting changes, also smoke-test these URLs on V7: `/`, `/zones`, `/modes`, `/config`, `/diagnostics`, and `/api/bootstrap`.
 
 For hardware-affecting changes, verify serial state through `/api/health` and the Diagnostics page. Confirm the Arduino Due is running `arduino/V7/V7.ino`, not V5 or V6 firmware.
 

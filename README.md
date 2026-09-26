@@ -26,6 +26,23 @@ python app.py
 
 Default URL: `http://127.0.0.1:5070`
 
+## Tests and Verification
+
+Install the development/test dependencies, then run the isolated regression suite:
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+The tests use temporary JSON data and stub the serial-sync worker, so they do **not** require an Arduino or `/dev/ttyACM0`.
+
+Syntax-check the Python source before deployment:
+
+```bash
+python -m py_compile app.py led_web_v7/*.py
+```
+
 ## Homeserver Deployment
 
 Runtime belongs on the homeserver:

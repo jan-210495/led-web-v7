@@ -45,9 +45,10 @@ Make this a dependable, understandable LED controller that:
 
 ## Phase 1 — Establish a safe engineering baseline
 
-- [ ] **1.1 Add a focused Python test harness and first regression tests.**
+- [x] **1.1 Add a focused Python test harness and first regression tests.**
   - Scope: introduce pytest-based tests and fixtures without changing current product behavior; cover app creation, default bootstrap data, storage validation, and selected API success/error paths.
   - Done when: tests run in one documented command, do not need real serial hardware, and pass alongside the existing Python compilation check.
+  - Completed 2026-09-26: added a seven-test isolated pytest suite, a development requirements file, documented verification commands, and cache/virtualenv ignore rules.
 
 - [ ] **1.2 Make JSON persistence crash-safe and diagnosable.**
   - Scope: replace direct JSON overwrites with atomic writes; add clear handling for invalid/corrupt JSON that reports the file and failure safely rather than producing an obscure startup error.

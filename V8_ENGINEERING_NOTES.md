@@ -63,6 +63,48 @@ No full Flask smoke test, serial-device test, Arduino compile, or formal test su
 - No application, firmware, dependency, or behavior changes were made in this step.
 - Awaiting user validation before beginning roadmap Step 1.1.
 
+### 2026-09-26 — Step 1.1: Focused Python test harness and first regression tests
+
+**Intent**
+- Establish a repeatable regression baseline before changing persistence, layout, or serial behavior.
+- Ensure application/API tests never need an Arduino, `/dev/ttyACM0`, or the repository's real `data/` directory.
+
+**Changes**
+- Added `requirements-dev.txt` with pytest pinned separately from production runtime dependencies.
+- Added `pytest.ini` to make `tests/` the explicit test root and to show concise summary output.
+- Added an isolated Flask fixture in `tests/conftest.py`.
+  - It supplies a temporary `data/` directory through a test-only `AppConfig`.
+  - It prevents the daemon serial queue from starting.
+  - It replaces layout synchronization with an in-memory recording stub, allowing route behavior to be asserted without serial I/O.
+- Added seven regression tests in `tests/test_storage.py` and `tests/test_routes.py`.
+  - Storage initialization/default JSON files.
+  - Zone creation blocked before any strip exists.
+  - Overlapping zone rejection.
+  - Hardware-free bootstrap response.
+  - Strip/zone API success and virtual layout result.
+  - Duplicate strip-pin rejection.
+  - Overlapping zone API rejection.
+- Added `.gitignore` entries for virtual environments and generated Python/pytest caches.
+- Documented the test and compilation commands in `README.md` and updated `AGENTS.md` to replace the former "no formal test suite" guidance.
+
+**Verification**
+- Created a disposable test virtual environment outside the repository at `/tmp/led-web-v7-test-venv`.
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m pytest` — **7 passed**.
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m pytest --collect-only -q` — **7 tests collected**.
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m py_compile app.py led_web_v7/*.py` — **passed**.
+- Hardware/manual verification: not applicable for this step; the test fixture intentionally prevents serial access.
+
+**Decisions / trade-offs**
+- Kept pytest in a development-only requirements file so homeserver runtime installs do not gain test-only dependencies.
+- Tests intentionally characterize the existing API responses and validation behavior; they do not preemptively alter product behavior planned for later roadmap steps.
+- The serial worker is stubbed at the app boundary rather than mocking pyserial internals. This makes route/storage tests fast and guarantees no attempt to open a real serial device.
+
+**Commit**
+- Recorded in the completion response after the single step commit is created and pushed.
+
+**Follow-up**
+- Next approved work must be roadmap Step 1.2: make JSON persistence crash-safe and diagnosable.
+
 ## Template for future completed steps
 
 Copy and fill this structure after each implementation step:
