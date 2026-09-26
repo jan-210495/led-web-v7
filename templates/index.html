@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="hero-grid">
+    <div class="panel panel-hero">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">System</div>
+                <h2>Global control for every connected pixel</h2>
+            </div>
+            <div class="serial-pill {{ 'ok' if serial_status.connected else 'bad' }}">
+                {{ 'Serial connected' if serial_status.connected else 'Serial offline' }}
+            </div>
+        </div>
+
+        <div class="hero-stats">
+            <div class="stat-card">
+                <span>Total strips</span>
+                <strong>{{ strips | length }}</strong>
+            </div>
+            <div class="stat-card">
+                <span>Total zones</span>
+                <strong>{{ zones | length }}</strong>
+            </div>
+            <div class="stat-card">
+                <span>Last sync</span>
+                <strong>{{ 'OK' if sync_status.last_layout_sync_ok else 'Pending' if sync_status.last_layout_sync_ok is none else 'Error' }}</strong>
+            </div>
+        </div>
+
+        <div class="control-grid global-card">
+            <div>
+                <label>Mode</label>
+                <select id="global_mode">
+                    {% for mode in enabled_modes %}
+                    <option value="{{ mode.id }}" {{ 'selected' if mode.id == runtime_state.global.mode else '' }}>{{ mode.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label>Brightness</label>
+                <input type="range" id="global_brightness" min="0" max="255" value="{{ runtime_state.global.brightness }}">
+                <div class="value-row"><span id="global_brightness_value">{{ runtime_state.global.brightness }}</span></div>
+            </div>
+
+            <div>
+                <label>Color</label>
+                <div id="picker_global" class="color-picker"></div>
+            </div>
+
+            <div class="button-stack">
+                <div class="button-row">
+                    <button class="btn btn-primary" onclick="emitGlobalOn()">All On</button>
+                    <button class="btn btn-danger" onclick="emitGlobalOff()">All Off</button>
+                </div>
+                <div class="button-row">
+                    <button class="btn btn-secondary" onclick="syncLayout()">Resync Device</button>
+                    <a class="text-link" href="/diagnostics">Open diagnostics</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Modes</div>
+                <h2>Choose a saved mode</h2>
+            </div>
+            <a class="text-link" href="/modes">Edit saved modes</a>
+        </div>
+
+        <div class="stack-list">
+            <div class="form-grid">
+                <div>
+                    <label>Saved mode</label>
+                    <select id="dashboard_preset_id">
+                        {% for preset in presets %}
+                        <option value="{{ preset.id }}">{{ preset.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="button-row button-row-end">
+                    <button class="btn btn-primary" onclick="applySelectedPreset()">Apply mode</button>
+                    <a class="text-link" href="/zones">Open zones page</a>
+                </div>
+            </div>
+
+            {% for preset in presets %}
+            <div class="stack-card">
+                <div class="preset-zone-head">
+                    <strong>{{ preset.name }}</strong>
+                    <span class="zone-meta">{{ preset.global_brightness }} brightness</span>
+                </div>
+                <div class="note">{{ preset.description or 'No description' }}</div>
+            </div>
+            {% else %}
+            <div class="empty-state">No saved modes yet. Create them on the Modes page.</div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <div class="eyebrow">Layout</div>
+            <h2>Connected pixel map</h2>
+        </div>
+        <a class="text-link" href="/config">Edit strips</a>
+    </div>
+
+    <div class="strip-list">
+        {% for strip in pixel_layout %}
+        <div class="strip-row">
+            <div>
+                <strong>{{ strip.label }}</strong>
+                <span>Pin {{ strip.pin }}</span>
+            </div>
+            <div class="mono">{{ strip.start }}-{{ strip.end }}</div>
+        </div>
+        {% else %}
+        <div class="empty-state">No strips configured yet. Add one on the configuration page.</div>
+        {% endfor %}
+    </div>
+
+    <div class="pixel-board" id="pixel_board"></div>
+</section>
+{% endblock %}

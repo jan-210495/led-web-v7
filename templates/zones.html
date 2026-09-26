@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="config-grid">
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Zones</div>
+                <h2>Zone management</h2>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div>
+                <label>Name</label>
+                <input type="text" id="new_zone_name" placeholder="screen_area">
+            </div>
+            <div>
+                <label>Label</label>
+                <input type="text" id="new_zone_label" placeholder="Screen Area">
+            </div>
+            <div>
+                <label>Start pixel</label>
+                <input type="number" id="new_zone_start" min="0" value="0">
+            </div>
+            <div>
+                <label>End pixel</label>
+                <input type="number" id="new_zone_end" min="0" value="0">
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button class="btn btn-primary" onclick="createZone()">Create zone</button>
+        </div>
+
+        <div id="zone_status" class="status"></div>
+
+        <div class="stack-list top-gap">
+            {% for zone in zones %}
+            <div class="stack-card">
+                <div class="zone-meta">{{ zone.name }} | {{ zone.start }}-{{ zone.end }}</div>
+                <div class="form-grid">
+                    <div>
+                        <label>Label</label>
+                        <input type="text" id="zone_label_{{ zone.name }}" value="{{ zone.label }}">
+                    </div>
+                    <div>
+                        <label>Start</label>
+                        <input type="number" id="zone_start_{{ zone.name }}" value="{{ zone.start }}" min="0">
+                    </div>
+                    <div>
+                        <label>End</label>
+                        <input type="number" id="zone_end_{{ zone.name }}" value="{{ zone.end }}" min="0">
+                    </div>
+                </div>
+                <div class="button-row">
+                    <button class="btn btn-secondary" onclick="updateZone('{{ zone.name }}')">Save zone</button>
+                    <button class="btn btn-danger" onclick="deleteZone('{{ zone.name }}')">Delete zone</button>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">No zones yet. Add strips first so the total pixel range is valid.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Layout</div>
+                <h2>Zone map</h2>
+            </div>
+        </div>
+
+        <div class="pixel-board" id="pixel_board"></div>
+    </div>
+</section>
+
+<section class="zones-section">
+    <div class="section-head">
+        <div>
+            <div class="eyebrow">Live Control</div>
+            <h2>Per-zone live controls</h2>
+        </div>
+    </div>
+
+    <div class="zones-grid">
+        {% for zone in zones %}
+        {% set zone_state = runtime_state.zones.get(zone.name, {"mode": 1, "brightness": 96, "color": [255, 96, 32]}) %}
+        <article class="panel zone-card" data-zone="{{ zone.name }}">
+            <div class="panel-header">
+                <div>
+                    <h3>{{ zone.label }}</h3>
+                    <div class="zone-meta">{{ zone.name }} | {{ zone.start }}-{{ zone.end }}</div>
+                </div>
+                <button class="btn btn-ghost" onclick="identifyZone('{{ zone.name }}')">Identify</button>
+            </div>
+
+            <div class="control-grid">
+                <div>
+                    <label>Mode</label>
+                    <select id="mode_{{ zone.name }}">
+                        {% for mode in enabled_modes %}
+                        <option value="{{ mode.id }}" {{ 'selected' if mode.id == zone_state.mode else '' }}>{{ mode.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label>Brightness</label>
+                    <input type="range" id="brightness_{{ zone.name }}" min="0" max="255" value="{{ zone_state.brightness }}">
+                    <div class="value-row"><span id="brightness_value_{{ zone.name }}">{{ zone_state.brightness }}</span></div>
+                </div>
+
+                <div>
+                    <label>Color</label>
+                    <div id="picker_{{ zone.name }}" class="color-picker"></div>
+                </div>
+            </div>
+
+            <div class="button-row">
+                <button class="btn btn-primary" onclick="emitZoneOn('{{ zone.name }}')">On</button>
+                <button class="btn btn-danger" onclick="emitZoneOff('{{ zone.name }}')">Off</button>
+            </div>
+        </article>
+        {% else %}
+        <div class="panel empty-state">No zones configured yet.</div>
+        {% endfor %}
+    </div>
+</section>
+{% endblock %}

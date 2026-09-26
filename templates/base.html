@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title }} | LED Controller V7</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
+</head>
+<body data-page="{{ request.endpoint }}">
+    <div class="app-shell">
+        <header class="topbar">
+            <div>
+                <div class="eyebrow">LED Controller</div>
+                <div class="brand-row">
+                    <h1 class="brand-title">V7</h1>
+                    <span class="brand-chip">{{ total_pixels }} pixels</span>
+                </div>
+            </div>
+
+            <nav class="nav-links">
+                <a href="/" class="{{ 'active' if request.endpoint == 'web.index' else '' }}">Dashboard</a>
+                <a href="/zones" class="{{ 'active' if request.endpoint == 'web.zones_page' else '' }}">Zones</a>
+                <a href="/modes" class="{{ 'active' if request.endpoint == 'web.modes_page' else '' }}">Modes</a>
+                <a href="/config" class="{{ 'active' if request.endpoint == 'web.config_page' else '' }}">Configuration</a>
+                <a href="/diagnostics" class="{{ 'active' if request.endpoint == 'web.diagnostics_page' else '' }}">Diagnostics</a>
+            </nav>
+        </header>
+
+        <main class="page-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script>
+        window.APP_BOOTSTRAP = {{ {
+            "strips": strips,
+            "zones": zones,
+            "modes": modes,
+            "enabled_modes": enabled_modes,
+            "settings": settings,
+            "total_pixels": total_pixels,
+            "pixel_layout": pixel_layout,
+            "serial_status": serial_status,
+            "serial_history": serial_history,
+            "runtime_state": runtime_state,
+            "sync_status": sync_status,
+            "presets": presets
+        } | tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

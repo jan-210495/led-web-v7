@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <div class="eyebrow">Saved Modes</div>
+            <h2>Reusable lighting presets</h2>
+        </div>
+        <div class="note">Use this page for saved setups like movie mode, gaming mode, or late-night mode.</div>
+    </div>
+
+    <div class="form-grid">
+        <div>
+            <label>Preset name</label>
+            <input type="text" id="new_preset_name" placeholder="Movie mode">
+        </div>
+        <div>
+            <label>Description</label>
+            <input type="text" id="new_preset_description" placeholder="Cyberpunk wave across the room">
+        </div>
+        <div>
+            <label>Global brightness</label>
+            <input type="number" id="new_preset_global_brightness" min="0" max="255" value="96">
+        </div>
+    </div>
+
+    <div class="preset-builder top-gap">
+        {% for zone in zones %}
+        <div class="stack-card">
+            <div class="preset-zone-head">
+                <strong>{{ zone.label }}</strong>
+                <span class="zone-meta">{{ zone.name }} | {{ zone.start }}-{{ zone.end }}</span>
+            </div>
+            <div class="form-grid">
+                <div class="checkbox-row">
+                    <label class="checkbox">
+                        <input type="checkbox" id="new_preset_zone_{{ zone.name }}_enabled" checked>
+                        Include zone
+                    </label>
+                </div>
+                <div>
+                    <label>Effect</label>
+                    <select id="new_preset_zone_{{ zone.name }}_mode">
+                        {% for mode in enabled_modes %}
+                        <option value="{{ mode.id }}">{{ mode.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label>Brightness</label>
+                    <input type="number" id="new_preset_zone_{{ zone.name }}_brightness" min="0" max="255" value="96">
+                </div>
+                <div>
+                    <label>Delay (ms)</label>
+                    <input type="number" id="new_preset_zone_{{ zone.name }}_delay_ms" min="10" max="2000" value="40">
+                </div>
+            </div>
+            <div class="palette-grid">
+                <div>
+                    <label>Primary color</label>
+                    <input type="color" id="new_preset_zone_{{ zone.name }}_color_1" value="#ff6020">
+                </div>
+                <div>
+                    <label>Secondary color</label>
+                    <input type="color" id="new_preset_zone_{{ zone.name }}_color_2" value="#ff008c">
+                </div>
+                <div>
+                    <label>Tertiary color</label>
+                    <input type="color" id="new_preset_zone_{{ zone.name }}_color_3" value="#00beff">
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">Create strips and zones first, then build saved modes for them here.</div>
+        {% endfor %}
+    </div>
+
+    <div class="button-row top-gap">
+        <button class="btn btn-primary" onclick="createPreset()">Save mode</button>
+    </div>
+    <div id="preset_status" class="status top-gap"></div>
+</section>
+
+<section class="stack-list">
+    {% for preset in presets %}
+    <article class="panel">
+        <div class="panel-header">
+            <div>
+                <h3>{{ preset.name }}</h3>
+                <div class="note">{{ preset.description or 'No description' }}</div>
+            </div>
+            <div class="button-row">
+                <button class="btn btn-primary" onclick="applyPreset({{ preset.id }})">Apply</button>
+                <button class="btn btn-danger" onclick="deletePreset({{ preset.id }})">Delete</button>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div>
+                <label>Preset name</label>
+                <input type="text" id="preset_{{ preset.id }}_name" value="{{ preset.name }}">
+            </div>
+            <div>
+                <label>Description</label>
+                <input type="text" id="preset_{{ preset.id }}_description" value="{{ preset.description }}">
+            </div>
+            <div>
+                <label>Global brightness</label>
+                <input type="number" id="preset_{{ preset.id }}_global_brightness" min="0" max="255" value="{{ preset.global_brightness }}">
+            </div>
+        </div>
+
+        <div class="preset-builder top-gap">
+            {% for zone in zones %}
+            {% set config = (preset.zone_configs | selectattr('zone', 'equalto', zone.name) | list | first) %}
+            {% set palette = config.palette if config else [[255, 96, 32], [255, 0, 140], [0, 190, 255]] %}
+            <div class="stack-card">
+                <div class="preset-zone-head">
+                    <strong>{{ zone.label }}</strong>
+                    <span class="zone-meta">{{ zone.name }}</span>
+                </div>
+                <div class="form-grid">
+                    <div class="checkbox-row">
+                        <label class="checkbox">
+                            <input type="checkbox" id="preset_{{ preset.id }}_zone_{{ zone.name }}_enabled" {{ 'checked' if (config.enabled if config else true) else '' }}>
+                            Include zone
+                        </label>
+                    </div>
+                    <div>
+                        <label>Effect</label>
+                        <select id="preset_{{ preset.id }}_zone_{{ zone.name }}_mode">
+                            {% for mode in enabled_modes %}
+                            <option value="{{ mode.id }}" {{ 'selected' if mode.id == (config.mode if config else 1) else '' }}>{{ mode.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label>Brightness</label>
+                        <input type="number" id="preset_{{ preset.id }}_zone_{{ zone.name }}_brightness" min="0" max="255" value="{{ config.brightness if config else 96 }}">
+                    </div>
+                    <div>
+                        <label>Delay (ms)</label>
+                        <input type="number" id="preset_{{ preset.id }}_zone_{{ zone.name }}_delay_ms" min="10" max="2000" value="{{ config.delay_ms if config else 40 }}">
+                    </div>
+                </div>
+                <div class="palette-grid">
+                    <div>
+                        <label>Primary color</label>
+                        <input type="color" id="preset_{{ preset.id }}_zone_{{ zone.name }}_color_1" value="{{ '#%02x%02x%02x' | format(palette[0][0], palette[0][1], palette[0][2]) }}">
+                    </div>
+                    <div>
+                        <label>Secondary color</label>
+                        <input type="color" id="preset_{{ preset.id }}_zone_{{ zone.name }}_color_2" value="{{ '#%02x%02x%02x' | format(palette[1][0], palette[1][1], palette[1][2]) }}">
+                    </div>
+                    <div>
+                        <label>Tertiary color</label>
+                        <input type="color" id="preset_{{ preset.id }}_zone_{{ zone.name }}_color_3" value="{{ '#%02x%02x%02x' | format(palette[2][0], palette[2][1], palette[2][2]) }}">
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="button-row top-gap">
+            <button class="btn btn-secondary" onclick="updatePreset({{ preset.id }})">Save changes</button>
+        </div>
+    </article>
+    {% else %}
+    <div class="panel empty-state">No saved modes yet. Build one above and save it for reuse.</div>
+    {% endfor %}
+</section>
+{% endblock %}

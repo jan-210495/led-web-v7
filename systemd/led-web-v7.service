@@ -1,0 +1,17 @@
+[Unit]
+Description=LED Controller V7
+After=network.target
+
+[Service]
+Type=simple
+User=abboudfam
+WorkingDirectory=/home/abboudfam/led-web-v7
+Environment=LED_WEB_HOST=0.0.0.0
+Environment=LED_WEB_PORT=5070
+Environment=PYTHONPATH=/home/abboudfam/led-web-v7/.venv/lib64/python3.12/site-packages
+ExecStart=/usr/bin/python3 /home/abboudfam/led-web-v7/app.py
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

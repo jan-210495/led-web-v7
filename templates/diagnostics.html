@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="config-grid">
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Health</div>
+                <h2>Serial and sync status</h2>
+            </div>
+            <div class="serial-pill {{ 'ok' if serial_status.connected else 'bad' }}">
+                {{ 'Serial connected' if serial_status.connected else 'Serial offline' }}
+            </div>
+        </div>
+
+        <div class="hero-stats">
+            <div class="stat-card">
+                <span>Port</span>
+                <strong>{{ settings.serial_port }}</strong>
+            </div>
+            <div class="stat-card">
+                <span>Baud</span>
+                <strong>{{ settings.baud_rate }}</strong>
+            </div>
+            <div class="stat-card">
+                <span>Viewed</span>
+                <strong>{{ now_label }}</strong>
+            </div>
+        </div>
+
+        <div class="stack-list">
+            <div class="stack-card">
+                <div class="zone-meta">Last command</div>
+                <div class="mono">{{ serial_status.last_command or 'none' }}</div>
+            </div>
+            <div class="stack-card">
+                <div class="zone-meta">Last response</div>
+                <div class="mono">{{ serial_status.last_response or 'none' }}</div>
+            </div>
+            <div class="stack-card">
+                <div class="zone-meta">Last layout sync</div>
+                <div class="mono">
+                    {{ sync_status.last_layout_sync_reason or 'not yet' }}
+                    {% if sync_status.last_layout_sync_ok is sameas true %}| ok{% elif sync_status.last_layout_sync_ok is sameas false %}| error{% endif %}
+                </div>
+            </div>
+            {% if serial_status.last_error or sync_status.last_layout_sync_error %}
+            <div class="stack-card">
+                <div class="zone-meta">Current error</div>
+                <div class="mono">{{ serial_status.last_error or sync_status.last_layout_sync_error }}</div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="button-row top-gap">
+            <button class="btn btn-primary" onclick="refreshDiagnostics()">Refresh diagnostics</button>
+            <button class="btn btn-secondary" onclick="syncLayout()">Resync layout</button>
+            <button class="btn btn-secondary" onclick="reconnectSerial()">Reconnect serial</button>
+        </div>
+
+        <div id="diagnostics_status" class="status top-gap"></div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Layout</div>
+                <h2>Current model</h2>
+            </div>
+        </div>
+
+        <pre class="log-box" id="diagnostics_snapshot">{{ {
+            "strips": strips,
+            "zones": zones,
+            "runtime_state": runtime_state,
+            "sync_status": sync_status
+        } | tojson(indent=2) }}</pre>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <div class="eyebrow">Serial Log</div>
+            <h2>Recent serial traffic</h2>
+        </div>
+    </div>
+
+    <pre class="log-box" id="serial_history_box">{% for item in serial_history %}[{{ item.direction }}] {{ item.payload }}
+{% endfor %}</pre>
+</section>
+{% endblock %}

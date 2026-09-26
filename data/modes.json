@@ -1,0 +1,79 @@
+[
+  {
+    "id": 0,
+    "key": "off",
+    "label": "Off",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 1,
+    "key": "solid",
+    "label": "Solid",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 2,
+    "key": "rainbow",
+    "label": "Rainbow",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 3,
+    "key": "chase",
+    "label": "Chase",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 4,
+    "key": "scanner",
+    "label": "Scanner",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 5,
+    "key": "breathing",
+    "label": "Breathing",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 6,
+    "key": "wave",
+    "label": "Wave",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 7,
+    "key": "chroma",
+    "label": "Chroma",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 8,
+    "key": "colorwaves",
+    "label": "Colorwaves",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 9,
+    "key": "twinkle",
+    "label": "Twinkle",
+    "enabled": true,
+    "system": true
+  },
+  {
+    "id": 10,
+    "key": "confetti",
+    "label": "Confetti",
+    "enabled": true,
+    "system": true
+  }
+]

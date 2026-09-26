@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="config-grid">
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Hardware</div>
+                <h2>Strip configuration</h2>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div>
+                <label>Label</label>
+                <input type="text" id="new_strip_label" placeholder="Desk right">
+            </div>
+            <div>
+                <label>Arduino pin</label>
+                <select id="new_strip_pin">
+                    {% for pin in settings.pin_options %}
+                    <option value="{{ pin }}">{{ pin }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label>Pixel count</label>
+                <input type="number" id="new_strip_pixels" min="1" value="37">
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button class="btn btn-primary" onclick="createStrip()">Add strip</button>
+            <button class="btn btn-secondary" onclick="syncLayout()">Resync device</button>
+        </div>
+
+        <div class="note top-gap">
+            V7 uses FastLED firmware-supported pins. The Arduino sketch currently compiles support for pins 2-13.
+        </div>
+
+        <div id="strip_status" class="status"></div>
+
+        <div class="stack-list top-gap">
+            {% for strip in strips %}
+            <div class="stack-card">
+                <div class="form-grid">
+                    <div>
+                        <label>Label</label>
+                        <input type="text" id="strip_label_{{ strip.id }}" value="{{ strip.label }}">
+                    </div>
+                    <div>
+                        <label>Pin</label>
+                        <input type="number" id="strip_pin_{{ strip.id }}" value="{{ strip.pin }}" min="0">
+                    </div>
+                    <div>
+                        <label>Pixels</label>
+                        <input type="number" id="strip_pixels_{{ strip.id }}" value="{{ strip.pixel_count }}" min="1">
+                    </div>
+                </div>
+                <div class="button-row">
+                    <button class="btn btn-secondary" onclick="updateStrip({{ strip.id }})">Save strip</button>
+                    <button class="btn btn-danger" onclick="deleteStrip({{ strip.id }})">Delete strip</button>
+                </div>
+            </div>
+            {% else %}
+            <div class="empty-state">No strips yet. Start by adding your current hardware layout.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div>
+                <div class="eyebrow">Animations</div>
+                <h2>Available modes</h2>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div>
+                <label>Mode ID</label>
+                <input type="number" id="new_mode_id" min="0" value="6">
+            </div>
+            <div>
+                <label>Label</label>
+                <input type="text" id="new_mode_label" placeholder="Sparkle">
+            </div>
+        </div>
+
+        <div class="button-row">
+            <button class="btn btn-primary" onclick="createMode()">Add mode</button>
+        </div>
+
+        <div id="mode_status" class="status"></div>
+
+        <div class="stack-list top-gap">
+            {% for mode in modes %}
+            <div class="stack-card">
+                <div class="form-grid">
+                    <div>
+                        <label>Mode ID</label>
+                        <input type="number" value="{{ mode.id }}" disabled>
+                    </div>
+                    <div>
+                        <label>Label</label>
+                        <input type="text" id="mode_label_{{ mode.id }}" value="{{ mode.label }}">
+                    </div>
+                    <div class="checkbox-row">
+                        <label class="checkbox">
+                            <input type="checkbox" id="mode_enabled_{{ mode.id }}" {{ 'checked' if mode.enabled else '' }}>
+                            Enabled in UI
+                        </label>
+                    </div>
+                </div>
+                <div class="button-row">
+                    <button class="btn btn-secondary" onclick="updateMode({{ mode.id }})">Save mode</button>
+                    {% if not mode.system %}
+                    <button class="btn btn-danger" onclick="deleteMode({{ mode.id }})">Delete mode</button>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<section class="panel">
+    <div class="panel-header">
+        <div>
+            <div class="eyebrow">Backend</div>
+            <h2>Serial settings</h2>
+        </div>
+    </div>
+
+    <div class="form-grid">
+        <div>
+            <label>Serial port</label>
+            <input type="text" id="serial_port" value="{{ settings.serial_port }}">
+        </div>
+        <div>
+            <label>Baud rate</label>
+            <input type="number" id="baud_rate" value="{{ settings.baud_rate }}" min="1">
+        </div>
+        <div>
+            <label>Flush interval (ms)</label>
+            <input type="number" id="flush_interval_ms" value="{{ settings.flush_interval_ms }}" min="10">
+        </div>
+    </div>
+
+    <div class="button-row">
+        <button class="btn btn-primary" onclick="saveSettings()">Save settings</button>
+        <button class="btn btn-secondary" onclick="reconnectSerial()">Reconnect serial</button>
+    </div>
+
+    <div id="settings_status" class="status"></div>
+    <div class="note top-gap">
+        Zone management and live zone control now live on the Zones page.
+    </div>
+</section>
+{% endblock %}
