@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import tempfile
 import threading
 from copy import deepcopy
 from pathlib import Path
@@ -32,6 +34,10 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "pin_options": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
 }
 DEFAULT_PRESETS: list[dict[str, Any]] = []
+
+
+class StorageDataError(RuntimeError):
+    """Persistent controller data could not be read or written safely."""
 
 
 class Storage:
@@ -67,12 +73,78 @@ class Storage:
         if not path.exists():
             self._write_json(path, deepcopy(default))
             return deepcopy(default)
-        with path.open("r", encoding="utf-8") as handle:
-            return json.load(handle)
+
+        try:
+            with path.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+        except json.JSONDecodeError as exc:
+            raise StorageDataError(
+                f"Data file '{path}' contains invalid JSON at line {exc.lineno}, column {exc.colno}: "
+                f"{exc.msg}. The file was not changed; repair it or restore a backup before restarting."
+            ) from exc
+        except UnicodeDecodeError as exc:
+            raise StorageDataError(
+                f"Data file '{path}' is not valid UTF-8: {exc}. "
+                "The file was not changed; repair it or restore a backup before restarting."
+            ) from exc
+        except OSError as exc:
+            raise StorageDataError(f"Could not read data file '{path}': {exc}") from exc
+
+        expected_type = type(default)
+        if not isinstance(payload, expected_type):
+            raise StorageDataError(
+                f"Data file '{path}' must contain a JSON {expected_type.__name__}, "
+                f"not {type(payload).__name__}. The file was not changed; repair it or restore a backup before restarting."
+            )
+        return payload
 
     def _write_json(self, path: Path, payload: Any) -> None:
-        with path.open("w", encoding="utf-8") as handle:
-            json.dump(payload, handle, indent=2)
+        """Write JSON through a same-directory staging file, then atomically replace the target."""
+        temporary_path: Path | None = None
+        replaced_target = False
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                dir=path.parent,
+                prefix=f".{path.name}.",
+                suffix=".tmp",
+                delete=False,
+            ) as handle:
+                temporary_path = Path(handle.name)
+                json.dump(payload, handle, indent=2)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+
+            os.replace(temporary_path, path)
+            temporary_path = None
+            replaced_target = True
+            self._fsync_directory(path.parent)
+        except OSError as exc:
+            recovery_note = (
+                "The target may already contain the new data; verify it before retrying."
+                if replaced_target
+                else "The existing target was left unchanged."
+            )
+            raise StorageDataError(f"Could not safely write data file '{path}': {exc}. {recovery_note}") from exc
+        finally:
+            if temporary_path is not None:
+                try:
+                    temporary_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+
+    @staticmethod
+    def _fsync_directory(directory: Path) -> None:
+        """Persist the rename metadata on filesystems that support directory fsync."""
+        if os.name == "nt":
+            return
+        directory_fd = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
 
     def _persist_all(self) -> None:
         self._write_json(self._paths["strips"], self._strips)

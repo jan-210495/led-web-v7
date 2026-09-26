@@ -50,9 +50,10 @@ Make this a dependable, understandable LED controller that:
   - Done when: tests run in one documented command, do not need real serial hardware, and pass alongside the existing Python compilation check.
   - Completed 2026-09-26: added a seven-test isolated pytest suite, a development requirements file, documented verification commands, and cache/virtualenv ignore rules.
 
-- [ ] **1.2 Make JSON persistence crash-safe and diagnosable.**
+- [x] **1.2 Make JSON persistence crash-safe and diagnosable.**
   - Scope: replace direct JSON overwrites with atomic writes; add clear handling for invalid/corrupt JSON that reports the file and failure safely rather than producing an obscure startup error.
   - Done when: all application-owned data writes are atomic, behavior is regression-tested, and invalid persisted data yields a useful operator-facing error.
+  - Completed 2026-09-26: all storage writes now fsync a same-directory temporary file before atomic replacement; malformed, unreadable, and wrong-root-type JSON now raises a file-specific recovery error without changing the source file.
 
 ## Phase 2 — Make the layout model truthful before it reaches hardware
 

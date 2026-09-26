@@ -105,6 +105,45 @@ No full Flask smoke test, serial-device test, Arduino compile, or formal test su
 **Follow-up**
 - Next approved work must be roadmap Step 1.2: make JSON persistence crash-safe and diagnosable.
 
+### 2026-09-26 — Step 1.2: Crash-safe, diagnosable JSON persistence
+
+**Intent**
+- Prevent a partial JSON target file when the process or host fails during a configuration write.
+- Replace raw JSON/parser failures with an operator-useful startup error that identifies the affected data file while preserving it for repair or restore.
+
+**Changes**
+- Added `StorageDataError`, a specific persistent-data exception.
+- Replaced direct JSON overwrites with same-directory temporary-file writes in `Storage._write_json`.
+  - JSON is written and flushed to a hidden temporary file.
+  - The temporary file is file-synced.
+  - `os.replace` atomically swaps it into the target path on the same filesystem.
+  - The containing directory is synced on non-Windows systems to persist rename metadata.
+  - A failed pre-replacement write/replacement cleans up the staging file and leaves the prior target intact. A post-replacement directory-sync failure explicitly tells the operator that the new target may already be present.
+- Improved `_read_json` diagnostics for malformed JSON, invalid UTF-8, file read errors, and an unexpected top-level JSON type.
+  - Errors identify the full data-file path and, for JSON parser failures, the line and column.
+  - Existing invalid files are never replaced with defaults. The message directs the operator to repair or restore the file before restart.
+- Added README recovery guidance.
+- Expanded storage coverage from three to six tests, including malformed JSON preservation, wrong-root-type detection, and simulated atomic-replacement failure.
+
+**Verification**
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m pytest` — **10 passed**.
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m py_compile app.py led_web_v7/*.py` — **passed**.
+- Ran a standalone startup-path check against malformed `strips.json`.
+  - The process exited with `StorageDataError` naming the exact data file in the temporary test directory plus `line 2, column 1` and recovery guidance.
+  - The malformed source contents were verified unchanged.
+- Hardware/manual verification: not applicable; this change is confined to server-side JSON persistence.
+
+**Decisions / trade-offs**
+- The controller fails fast rather than silently replacing malformed configuration. Silent replacement could lose a user's strip/zone layout and make the actual failure difficult to diagnose.
+- This step validates top-level JSON container types (`list` or `dict`) only. Field/schema-level validation and firmware capability limits remain intentionally deferred to Phase 2.
+- Temporary files are created beside their target so `os.replace` remains atomic on the same filesystem. The `fsync` calls favor durability over a negligible configuration-save overhead.
+
+**Commit**
+- Recorded in the completion response after the single step commit is created and pushed.
+
+**Follow-up**
+- Next approved work must be roadmap Step 2.1: define one canonical V7 device-capability contract in Python.
+
 ## Template for future completed steps
 
 Copy and fill this structure after each implementation step:
