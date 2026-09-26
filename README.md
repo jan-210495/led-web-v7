@@ -55,6 +55,10 @@ Configuration in `data/*.json` is written through a same-directory temporary fil
 
 The application rejects unsupported data pins, strips longer than 300 pixels, more than 12 active strips, more than 20 zones, uncompiled effect IDs, and zone names/commands that would overflow the firmware serial buffer. HTTP configuration APIs return `400` with the validation message. Existing persisted layouts are also checked at startup so unsupported hardware data cannot be synchronized accidentally; repair the named JSON file before restarting if startup reports an incompatible configuration.
 
+### Stable virtual-pixel mapping
+
+The V7 firmware traverses active strips in ascending compiled data-pin order; the web app uses the same order for its virtual pixel layout. Before a strip is added, resized, moved to another pin, or removed, the app compares every saved zone's physical strip/local-pixel segments before and after the proposed change. Changes that would make a zone address different physical LEDs are rejected. Safe changes that leave every existing zone on the same physical pixels, such as changing an unused trailing strip, remain available.
+
 ## Homeserver Deployment
 
 Runtime belongs on the homeserver:

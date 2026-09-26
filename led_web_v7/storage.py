@@ -61,6 +61,7 @@ class Storage:
         with self._lock:
             self._strips = self._read_json("strips", DEFAULT_STRIPS)
             self._validate_persisted("strips", self._validate_persisted_strips)
+            self._strips = self._ordered_strips(self._strips)
             self._zones = self._read_json("zones", DEFAULT_ZONES)
             self._validate_persisted("zones", self._validate_persisted_zones)
             self._modes = self._normalize_persisted("modes", self._read_json("modes", DEFAULT_MODES), self._normalize_modes)
@@ -195,9 +196,17 @@ class Storage:
         return sum(int(strip["pixel_count"]) for strip in self._strips)
 
     def pixel_layout(self) -> list[dict[str, Any]]:
+        return self._pixel_layout_for(self._strips)
+
+    @staticmethod
+    def _ordered_strips(strips: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Match the Arduino firmware's compiled ascending-pin traversal order."""
+        return sorted(strips, key=lambda strip: (int(strip["pin"]), int(strip["id"])))
+
+    def _pixel_layout_for(self, strips: list[dict[str, Any]]) -> list[dict[str, Any]]:
         layout = []
         cursor = 0
-        for strip in self._strips:
+        for strip in self._ordered_strips(strips):
             count = int(strip["pixel_count"])
             layout.append(
                 {
@@ -208,6 +217,55 @@ class Storage:
             )
             cursor += count
         return layout
+
+    def _zone_physical_mappings(
+        self,
+        strips: list[dict[str, Any]],
+    ) -> dict[str, tuple[tuple[int, int, int], ...]]:
+        """Map each saved virtual zone to stable strip-ID/local-pixel segments."""
+        mappings: dict[str, tuple[tuple[int, int, int], ...]] = {}
+        layout = self._pixel_layout_for(strips)
+        for zone in self._zones:
+            segments: list[tuple[int, int, int]] = []
+            zone_start = int(zone["start"])
+            zone_end = int(zone["end"])
+            for strip in layout:
+                overlap_start = max(zone_start, int(strip["start"]))
+                overlap_end = min(zone_end, int(strip["end"]))
+                if overlap_start <= overlap_end:
+                    segments.append(
+                        (
+                            int(strip["id"]),
+                            overlap_start - int(strip["start"]),
+                            overlap_end - int(strip["start"]),
+                        )
+                    )
+            mappings[zone["name"]] = tuple(segments)
+        return mappings
+
+    def _validate_proposed_strip_layout(self, proposed_strips: list[dict[str, Any]]) -> None:
+        """Reject strip edits that would make saved virtual zones address different LEDs."""
+        proposed_total = sum(int(strip["pixel_count"]) for strip in proposed_strips)
+        for zone in self._zones:
+            if int(zone["end"]) >= proposed_total:
+                raise ValueError("Layout change would leave existing zones outside the available pixel range")
+
+        if not self._zones:
+            return
+
+        current_mappings = self._zone_physical_mappings(self._strips)
+        proposed_mappings = self._zone_physical_mappings(proposed_strips)
+        changed_zones = [
+            name
+            for name, mapping in current_mappings.items()
+            if proposed_mappings.get(name) != mapping
+        ]
+        if changed_zones:
+            listed_zones = ", ".join(changed_zones)
+            raise ValueError(
+                "Layout change would move existing zones to different physical pixels: "
+                f"{listed_zones}. Update or delete those zones first."
+            )
 
     def strip_by_id(self, strip_id: int) -> dict[str, Any] | None:
         for strip in self._strips:
@@ -388,8 +446,9 @@ class Storage:
                 "pixel_count": pixel_count,
                 "label": (label or "").strip() or f"Pin {pin}",
             }
-            self._strips.append(strip)
-            self._strips.sort(key=lambda item: int(item["pin"]))
+            proposed_strips = [*self._strips, strip]
+            self._validate_proposed_strip_layout(proposed_strips)
+            self._strips = self._ordered_strips(proposed_strips)
             self._write_json(self._paths["strips"], self._strips)
             return deepcopy(strip)
 
@@ -407,29 +466,29 @@ class Storage:
             if any(int(strip["pin"]) == pin and int(strip["id"]) != int(strip_id) for strip in self._strips):
                 raise ValueError(f"Pin {pin} is already assigned")
 
-            new_total = self.total_pixels() - int(target["pixel_count"]) + pixel_count
-            for zone in self._zones:
-                if int(zone["end"]) >= new_total:
-                    raise ValueError("Resize would cut off existing zones. Update or delete those zones first.")
-
-            target["pin"] = pin
-            target["pixel_count"] = pixel_count
-            target["label"] = (label or "").strip() or f"Pin {pin}"
-            self._strips.sort(key=lambda item: int(item["pin"]))
+            updated_strip = {
+                **target,
+                "pin": pin,
+                "pixel_count": pixel_count,
+                "label": (label or "").strip() or f"Pin {pin}",
+            }
+            proposed_strips = [
+                updated_strip if int(strip["id"]) == int(strip_id) else deepcopy(strip)
+                for strip in self._strips
+            ]
+            self._validate_proposed_strip_layout(proposed_strips)
+            self._strips = self._ordered_strips(proposed_strips)
             self._write_json(self._paths["strips"], self._strips)
-            return deepcopy(target)
+            return deepcopy(updated_strip)
 
     def delete_strip(self, strip_id: int) -> None:
         with self._lock:
             target = self.strip_by_id(strip_id)
             if target is None:
                 raise ValueError("Strip not found")
-            remaining = [strip for strip in self._strips if int(strip["id"]) != int(strip_id)]
-            total_after_delete = sum(int(strip["pixel_count"]) for strip in remaining)
-            for zone in self._zones:
-                if int(zone["end"]) >= total_after_delete:
-                    raise ValueError("Delete would leave zones outside the available pixel range")
-            self._strips = remaining
+            remaining = [deepcopy(strip) for strip in self._strips if int(strip["id"]) != int(strip_id)]
+            self._validate_proposed_strip_layout(remaining)
+            self._strips = self._ordered_strips(remaining)
             self._write_json(self._paths["strips"], self._strips)
 
     def add_zone(self, name: str, start: int, end: int, label: str | None = None) -> dict[str, Any]:

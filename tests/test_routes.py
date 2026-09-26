@@ -57,6 +57,21 @@ def test_api_rejects_values_outside_the_firmware_contract(client) -> None:
     assert invalid_preset.get_json()["message"].startswith("Mode ID 11 is not supported by V7 firmware")
 
 
+def test_strip_api_blocks_layout_changes_that_would_remap_existing_zones(client) -> None:
+    client.post("/api/strips", json={"pin": 4, "pixel_count": 10, "label": "Desk"})
+    client.post("/api/zones", json={"name": "desk", "start": 0, "end": 9})
+
+    response = client.post("/api/strips", json={"pin": 2, "pixel_count": 5, "label": "New first strip"})
+
+    assert response.status_code == 400
+    assert response.get_json()["message"] == (
+        "Layout change would move existing zones to different physical pixels: desk. "
+        "Update or delete those zones first."
+    )
+    bootstrap = client.get("/api/bootstrap").get_json()
+    assert [strip["pin"] for strip in bootstrap["strips"]] == [4]
+
+
 def test_live_socket_rejects_an_uncompiled_effect_before_queueing(client, app) -> None:
     client.post("/api/strips", json={"pin": 2, "pixel_count": 1, "label": "Desk"})
     client.post("/api/zones", json={"name": "desk", "start": 0, "end": 0})

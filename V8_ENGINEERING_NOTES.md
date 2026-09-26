@@ -228,6 +228,48 @@ No full Flask smoke test, serial-device test, Arduino compile, or formal test su
 **Follow-up**
 - Next approved work must be roadmap Step 2.3: preserve virtual-pixel mapping during strip changes.
 
+### 2026-09-26 — Step 2.3: Preserve virtual-pixel mapping during strip changes
+
+**Intent**
+- Prevent a strip add, resize, pin move, or deletion from silently causing a saved zone's numeric range to address different physical LEDs.
+- Establish one explicit ordering rule shared by the application and compiled Arduino firmware.
+
+**Changes**
+- Defined virtual strip order as ascending Arduino data-pin order, matching the firmware's `SUPPORTED_PINS` traversal in `setVirtualPixel`.
+- Added storage helpers that:
+  - build virtual layouts from this firmware order;
+  - translate each zone into stable `(strip ID, local start, local end)` physical segments; and
+  - compare current and proposed strip layouts before a mutation is persisted.
+- Strip additions, edits, and deletions now use a proposed-layout validation flow before mutating in-memory data or JSON.
+  - If a zone would address a different strip/local-pixel segment, the operation is rejected with the exact affected zone names.
+  - If a layout shrink would leave a zone outside the available virtual range, the operation is rejected directly.
+  - Changes that leave every saved zone physically identical are allowed, including safe modifications/deletion of unused trailing strips.
+- Normalized loaded strips to ascending pin order so persisted configuration, dashboard layout, configuration list, serial sync ordering, and firmware traversal agree.
+- Added configuration-page and README explanations of the ordering and blocking behavior.
+
+**Verification**
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m pytest` — **29 passed**.
+- Ran `/tmp/led-web-v7-test-venv/bin/python -m py_compile app.py led_web_v7/*.py` — **passed**.
+- Added coverage for:
+  - firmware pin ordering even when strips are added out of order;
+  - rejection when inserting a preceding strip would remap a zone;
+  - rejection when resizing a preceding strip would remap a zone;
+  - rejection when changing pin order would remap a zone;
+  - acceptance of safe trailing-strip resize/deletion; and
+  - the HTTP 400 response for a blocked strip change.
+- Arduino compile/hardware verification: not applicable; no firmware code or wire protocol changed.
+
+**Decisions / trade-offs**
+- A separate arbitrary strip-order field was deliberately not introduced. The current Arduino firmware always maps virtual pixels by compiled pin order, so persisting a different web-only order would be misleading and unsafe without a firmware protocol redesign.
+- The guard compares physical segment identity rather than applying a simplistic rule such as "never edit a strip with zones." This permits safe maintenance when all existing zones remain on the same LEDs while preventing accidental remapping.
+- Blocked operations require the operator to update or remove the named zones first. Automatic zone-offset rewriting was rejected because a layout change can be ambiguous across physical strips and could light the wrong hardware.
+
+**Commit**
+- Recorded in the completion response after the single step commit is created and pushed.
+
+**Follow-up**
+- Next approved work must be roadmap Step 2.4: add a server-side layout preview/validation endpoint.
+
 ## Template for future completed steps
 
 Copy and fill this structure after each implementation step:

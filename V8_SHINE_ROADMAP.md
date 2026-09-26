@@ -67,9 +67,10 @@ Make this a dependable, understandable LED controller that:
   - Done when: impossible hardware configurations receive clear HTTP 400 messages and are covered by tests.
   - Completed 2026-09-26: centralized validators now block impossible persisted/API/live-control configuration, direct-command overflow/injection, and invalid firmware effects before hardware queueing; regression suite expanded to 23 tests.
 
-- [ ] **2.3 Preserve virtual-pixel mapping during strip changes.**
+- [x] **2.3 Preserve virtual-pixel mapping during strip changes.**
   - Scope: explicitly define stable physical strip ordering and prevent or safely handle edits/deletions that would silently make existing zone indexes point at different LEDs.
   - Done when: strip changes either preserve the affected zone mapping or are blocked with a precise explanation; the chosen behavior is tested and documented.
+  - Completed 2026-09-26: virtual order is explicitly ascending Arduino pin order, and every proposed strip add/edit/delete now compares saved zones by strip ID/local-pixel segments to block only changes that would remap physical LEDs.
 
 - [ ] **2.4 Add a server-side layout preview/validation endpoint.**
   - Scope: expose a read-only preflight representation of strips, virtual ranges, zones, and detected layout warnings for use by the UI and diagnostics.
